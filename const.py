@@ -17,3 +17,4 @@ FIRST_DIALOGUE = "you started this bot \n" \
 SCORE_MSG = "Вы: {}, Бот: {}, Результат: {}"
 REPLY_ROUND_MSG = "Вы: {}, Бот: {}, Осталось ходов: {}"
 STATISTIC_MSG = "wins: {}, defeats: {}"
+PATTERN = {"wins": 0, "defeats": 0, "steps": 3}
