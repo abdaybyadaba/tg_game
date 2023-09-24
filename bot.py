@@ -111,6 +111,7 @@ async def cmd_start(msg: types.Message):
     user_id = msg.from_user.id
     # проверка (если в буферных переменных есть данные сообщения то при запросе start ничего не произойдет)
     if user_id not in bot.main_score:
+        print(bot.main_score, "1")
         bot.main_score[user_id] = deepcopy(PATTERN)
         bot.delete_list[user_id] = []
         logging.info("here you are")
@@ -126,7 +127,7 @@ async def game_start(call: types.CallbackQuery):
     await delete_messages(user_id)
     await bot.edit_message_text(chat_id=bot.chat_id[user_id],
                                 message_id=bot.message_id[user_id],
-                                text=REPLY_ROUND_MSG.format(0, 0, 0))
+                                text=REPLY_ROUND_MSG.format(0, 0, 3))
 
     await bot.edit_message_reply_markup(chat_id=bot.chat_id[user_id],
                                         message_id=bot.message_id[user_id],
@@ -160,32 +161,31 @@ async def statistic_mes(callback: types.CallbackQuery):
 @dp.callback_query(F.data.in_({"камень", "ножницы", "бумага"}))
 async def over_round_print(callback: types.CallbackQuery):
     user_id = callback.from_user.id
-    if bot.main_score[user_id]["steps"]:
+    print(bot.main_score)
+    result = round_judge(callback.data)
+    bot.main_score[user_id]["steps"] -= 1  # убавление \ добавление ходов (при ничье)
 
-        result = round_judge(callback.data)
-        bot.main_score[user_id]["steps"] -= 1  # убавление \ добавление ходов (при ничье)
+    # запись результатов матча внутри раунда в словарь main_score
+    if result[0] != "no one's":
+        bot.main_score[user_id][result[0]] += 1
 
-        # запись результатов матча внутри раунда в словарь main_score
-        if result[0] != "no one's":
-            bot.main_score[user_id][result[0]] += 1
+    # выводные сообщения
+    ans = SCORE_MSG.format(UNICODE_MAPPING[callback.data], UNICODE_MAPPING[result[1]])
 
-        # выводные сообщения
-        ans = SCORE_MSG.format(UNICODE_MAPPING[callback.data], UNICODE_MAPPING[result[1]])
-
-        ans_mes_text = REPLY_ROUND_MSG.format(bot.main_score[user_id]["wins"],
+    ans_mes_text = REPLY_ROUND_MSG.format(bot.main_score[user_id]["wins"],
                                               bot.main_score[user_id]["defeats"],
                                               bot.main_score[user_id]["steps"])
 
-        await bot.edit_message_text(chat_id=bot.chat_id[user_id],
-                                    message_id=bot.message_id[user_id],
-                                    text=ans_mes_text)
-        await bot.edit_message_reply_markup(chat_id=bot.chat_id[user_id],
-                                                message_id=bot.message_id[user_id],
-                                            reply_markup=await game_kb_builder())
+    await bot.edit_message_text(chat_id=bot.chat_id[user_id],
+                                message_id=bot.message_id[user_id],
+                                text=ans_mes_text)
+    await bot.edit_message_reply_markup(chat_id=bot.chat_id[user_id],
+                                            message_id=bot.message_id[user_id],
+                                        reply_markup=await game_kb_builder())
 
-        n_message = await callback.message.answer(text=ans)
-        bot.delete_list[user_id].append(n_message)
-        await check_round_over(callback)
+    n_message = await callback.message.answer(text=ans)
+    bot.delete_list[user_id].append(n_message)
+    await check_round_over(callback)
 
 
 @dp.callback_query(F.data == "back to menu")
