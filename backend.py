@@ -39,6 +39,3 @@ def pickle_write(user_id, value):
         with open("data.pickle", "wb") as f:
             pickle.dump(buffer, f)
     #  [user_id] = {"wins": 0, "defeats": 0}
-
-
-
