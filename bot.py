@@ -37,7 +37,6 @@ bot.delete_list = {}
 
 async def delete_messages(user_id):
     if bot.delete_list[user_id]:  # удаление сообщений раунда
-        print(bot.delete_list)
         for mes in bot.delete_list[user_id]:
             await bot.delete_message(chat_id=mes.chat.id, message_id=mes.message_id)
         bot.delete_list[user_id] = []
@@ -61,8 +60,8 @@ async def game_kb_builder():
 
 
 async def back_to_menu(user_id):
-
     bot.main_score[user_id] = deepcopy(PATTERN)
+    bot.main_score[user_id]["steps"] = 0
     await delete_messages(user_id)
 
     # возвращение сообщения\действия
@@ -82,7 +81,6 @@ async def send_gif(call: types.CallbackQuery, battleresult):
         image_from_pc = FSInputFile("{}.gif".format(GIF_PATHS[battleresult]))
         result = await bot.send_animation(bot.chat_id[user_id], image_from_pc)
         bot.delete_list[user_id].append(result)
-        print(result.animation)
         bot.file_ids[user_id][battleresult] = result.animation.file_id
 
 
@@ -101,7 +99,7 @@ async def check_round_over(call: types.CallbackQuery):
             await send_gif(call, rslt)
             await asyncio.sleep(2)
 
-            await delete_messages(user_id)
+            await back_to_menu(user_id)
         else:
             bot.main_score[user_id]["steps"] += 1
 
@@ -111,7 +109,6 @@ async def cmd_start(msg: types.Message):
     user_id = msg.from_user.id
     # проверка (если в буферных переменных есть данные сообщения то при запросе start ничего не произойдет)
     if user_id not in bot.main_score:
-        print(bot.main_score, "1")
         bot.main_score[user_id] = deepcopy(PATTERN)
         bot.delete_list[user_id] = []
         logging.info("here you are")
@@ -124,6 +121,7 @@ async def cmd_start(msg: types.Message):
 @dp.callback_query(F.data == "game")
 async def game_start(call: types.CallbackQuery):
     user_id = call.from_user.id
+    bot.main_score[user_id]["steps"] = 3
     await delete_messages(user_id)
     await bot.edit_message_text(chat_id=bot.chat_id[user_id],
                                 message_id=bot.message_id[user_id],
@@ -139,7 +137,6 @@ async def statistic_mes(callback: types.CallbackQuery):
     logging.info("statistic")
     user_id = callback.from_user.id
     await delete_messages(user_id)
-    print(bot.chat_id, bot.message_id)
     # выводимые тексты
     ans_p = pickle_read(callback.from_user.id)
     ans_text = STATISTIC_MSG.format(ans_p["wins"], ans_p["defeats"])
@@ -161,31 +158,29 @@ async def statistic_mes(callback: types.CallbackQuery):
 @dp.callback_query(F.data.in_({"камень", "ножницы", "бумага"}))
 async def over_round_print(callback: types.CallbackQuery):
     user_id = callback.from_user.id
-    print(bot.main_score)
     result = round_judge(callback.data)
-    bot.main_score[user_id]["steps"] -= 1  # убавление \ добавление ходов (при ничье)
+    bot.main_score[user_id]["steps"] -= 1  # убавление ходов
 
     # запись результатов матча внутри раунда в словарь main_score
     if result[0] != "no one's":
         bot.main_score[user_id][result[0]] += 1
 
-    # выводные сообщения
-    ans = SCORE_MSG.format(UNICODE_MAPPING[callback.data], UNICODE_MAPPING[result[1]])
-
-    ans_mes_text = REPLY_ROUND_MSG.format(bot.main_score[user_id]["wins"],
-                                              bot.main_score[user_id]["defeats"],
-                                              bot.main_score[user_id]["steps"])
-
-    await bot.edit_message_text(chat_id=bot.chat_id[user_id],
-                                message_id=bot.message_id[user_id],
-                                text=ans_mes_text)
-    await bot.edit_message_reply_markup(chat_id=bot.chat_id[user_id],
-                                            message_id=bot.message_id[user_id],
-                                        reply_markup=await game_kb_builder())
-
-    n_message = await callback.message.answer(text=ans)
-    bot.delete_list[user_id].append(n_message)
     await check_round_over(callback)
+    if bot.main_score[user_id]["steps"]:
+        # выводные сообщения
+        ans = SCORE_MSG.format(UNICODE_MAPPING[callback.data], UNICODE_MAPPING[result[1]])
+        n_message = await callback.message.answer(text=ans)
+        bot.delete_list[user_id].append(n_message)
+        ans_mes_text = REPLY_ROUND_MSG.format(bot.main_score[user_id]["wins"],
+                                                    bot.main_score[user_id]["defeats"],
+                                                    bot.main_score[user_id]["steps"])
+
+        await bot.edit_message_text(chat_id=bot.chat_id[user_id],
+                                        message_id=bot.message_id[user_id],
+                                        text=ans_mes_text)
+        await bot.edit_message_reply_markup(chat_id=bot.chat_id[user_id],
+                                                message_id=bot.message_id[user_id],
+                                            reply_markup=await game_kb_builder())
 
 
 @dp.callback_query(F.data == "back to menu")
